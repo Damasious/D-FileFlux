@@ -1,0 +1,11 @@
+# Arquivos de ambiente
+.env
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+
+# Diretórios e arquivos de configuração de IDE ou editor de texto
+.vscode/
+.idea/
+*.swp

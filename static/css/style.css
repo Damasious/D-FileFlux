@@ -1,0 +1,30 @@
+
+body {
+    background-color: black;
+    color: #0f0; /* Cor hexadecimal simplificada */
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.form-signin {
+    width: 100%;
+    max-width: 330px;
+    padding: 15px;
+    margin: auto;
+    background: rgba(0, 0, 0, 0.85); /* Fundo transparente */
+    border: 1px solid #00ff00;
+}
+
+.form-signin input, .form-signin button {
+    background: none;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+}
+
+.form-signin button.btn-custom {
+    background-color: #005700;
+    border-color: #00ff00;
+}
+
+#login-status {
+    color: red;
+}

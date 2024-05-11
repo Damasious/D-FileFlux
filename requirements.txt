@@ -1,0 +1,8 @@
+Flask==2.1.2
+Flask-Login==0.6.1
+Werkzeug==2.1.1
+SQLAlchemy==1.4.32
+dash==2.3.1
+dash-bootstrap-components==1.1.0
+pandas==1.4.2
+python-dotenv==0.20.0
