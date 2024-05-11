@@ -10,12 +10,13 @@
 <body class="text-center">
     <div class="container d-flex align-items-center justify-content-center" style="height: 100vh;">
         <form class="form-signin" id="login-form">
-            <h1 class="h3 mb-3 font-weight-normal" id="animated-title">Por favor, faça login</h1>
-            <input type="email" id="email-input" class="form-control" placeholder="Endereço de email" required autofocus>
+            <h1 class="h3 mb-3 font-weight-normal" id="animated-title">D-FileFlux</h1>
+            <input type="email" id="email-input" class="form-control mb-3" placeholder="Endereço de email" required autofocus>
             <input type="password" id="password-input" class="form-control" placeholder="Senha" required>
+
             <div id="login-status" class="mt-3"></div>
             <button class="btn btn-lg btn-custom btn-block" type="submit">Login</button>
-            <p class="mt-5 mb-3 text-muted">&copy; 2024</p>
+            <p class="mt-5 mb-3 text-muted">&copy; Fernando Damásio 2024</p>
         </form>
     </div>
     <script src="{{ url_for('static', filename='js/login.js') }}"></script>

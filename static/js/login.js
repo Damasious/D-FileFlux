@@ -7,7 +7,7 @@ document.getElementById('login-form').addEventListener('submit', function(event)
     formData.append('email', email);
     formData.append('password', password);
 
-    fetch('/login', {
+    fetch('/', {
         method: 'POST',
         body: formData
     })

@@ -1,4 +1,4 @@
-from flask import Flask, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, Boolean, select, func, DateTime
@@ -8,6 +8,7 @@ import datetime
 from datetime import datetime, timedelta
 import dash
 from dash import html, dcc, Input, Output, State, dash_table
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import pandas as pd
 import base64
@@ -59,7 +60,7 @@ login_manager = LoginManager()
 login_manager.init_app(server)
 login_manager.login_view = 'login'
 
-@server.route('/login', methods=['GET', 'POST'])
+@server.route('/', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect('/home')  # Redireciona se já estiver autenticado
@@ -82,26 +83,7 @@ def login():
 
         flash('Login Failed. Please check username and password.')
 
-    return login_layout()
-
-
-@server.route('/logout')
-def logout():
-    logout_user()
-    return redirect('/login')
-
-
-
-def delete_user(email):
-    if is_admin():
-        delete_query = users_table.delete().where(users_table.c.email == email)
-        db_session.execute(delete_query)
-        db_session.commit()
-        logging.info(f"Admin {current_user.id} deleted user {email}")
-        return "Usuário deletado com sucesso."
-    return "Acesso negado."
-
-
+    return render_template('login.html')
 
 # Classe de usuário
 class User(UserMixin):
@@ -118,6 +100,11 @@ def load_user(user_id):
         user = User(user_query.email, user_query.superuser)  # Adicione o atributo superuser aqui
         return user
     return None
+
+@server.route('/logout')
+def logout():
+    logout_user()
+    return ('/')
 
 
 def is_admin():
@@ -148,7 +135,8 @@ app.index_string = """<!DOCTYPE html>
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div(id='page-content', style={'backgroundColor': 'black'})
+    html.Div(id='page-content', style={'backgroundColor': 'black'}),
+    
 ])
 
 # Callback de login modificado
@@ -182,19 +170,17 @@ def display_page(pathname):
 
     return html.Div("You are not authorized to view this page", style={'color': 'red'})
 
-
-    
-
 def login_layout():
-    return html.Div([
-        dbc.Container([
-            html.H2("D-FileFlux", style={'color': '#00ff00', 'textAlign': 'center'}),
-            dbc.Input(type="email", id="email-input", placeholder="Seu email", className="mb-3", style={'backgroundColor': 'black', 'color': '#00ff00'}),
-            dbc.Input(type="password", id="password-input", placeholder="Sua Senha", className="mb-3", style={'backgroundColor': 'black', 'color': '#00ff00'}),
-            dbc.Button("Login", id="login-button", n_clicks=0, style={'backgroundColor': 'green', 'color': 'black'}),
-            html.Div(id='login-status', style={'color': 'red'})
-        ], style={'textAlign': 'center', 'width': '300px', 'marginTop': '100px', 'marginLeft': 'auto', 'marginRight': 'auto', 'border': '1px solid green', 'padding': '20px'}),
-    ], style={'height': '100vh', 'backgroundColor': 'black'})
+    return render_template('login.html')
+
+
+@app.callback(Output('redirect', 'pathname'),
+              [Input('logout-button', 'n_clicks')])
+def logout_redirect(n_clicks):
+    if n_clicks > 0:
+        logout_user()
+        return ('/')  # Redireciona para a tela de login após o logout
+    return dash.no_update
 
 def query_data():
     with engine.connect() as connection:
@@ -280,9 +266,10 @@ def home_layout():
     layout.append(
         html.Footer([
             html.P("por Fernando Damásio", style={'fontSize': 'small', 'textAlign': 'center'}),
+            html.Button('Sair', id='logout-button', n_clicks=0, style={'backgroundColor': '#00ff00', 'color': 'black','float': 'right'}),
         ], style={
             'width': '100%', 'backgroundColor': 'black', 'color': '#00ff00', 'padding': '10px', 'borderTop': '1px solid green'
-        })
+        }),              
     )
 
     return html.Div(layout, style={'backgroundColor': 'black', 'color': '#00ff00'})
@@ -364,15 +351,9 @@ def update_output(contents, filename, last_modified, existing_children):
             )
             db_session.execute(new_file)
             db_session.commit()
-            
-            new_file = files_table.insert().values(
-                filename=filename, content=file_data, timestamp=datetime.utcnow().isoformat()
-            )
-            db_session.execute(new_file)
-            db_session.commit()
 
             # Construindo novos componentes HTML para serem exibidos
-            new_upload = html.Div([            
+            new_upload = html.Div([
                 html.H5(filename),
                 html.H6(datetime.fromtimestamp(int(last_modified)).strftime('%Y-%m-%d %H:%M:%S')),
                 dbc.Tabs([
@@ -388,7 +369,7 @@ def update_output(contents, filename, last_modified, existing_children):
                             )
                         ])
                     ], tab_style={'backgroundColor': 'black', 'color': 'green'},
-                          tab_class_name='custom-tab', active_tab_style={'backgroundColor': 'green', 'color': 'black'}),
+                          active_tab_style={'backgroundColor': 'green', 'color': 'black'}),
                     dbc.Tab(label='Recursos', children=[
                         html.Div([
                             html.H1("Dados de Recursos", style={'color': '#00ff00'}),
