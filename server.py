@@ -5,8 +5,8 @@ from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, 
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.sql import select
 import datetime
-from datetime import datetime, timedelta
-import dash
+from datetime import datetime, timedelta 
+import dash, pytz
 from dash import html, dcc, Input, Output, State, dash_table
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
@@ -346,9 +346,13 @@ def update_output(contents, filename, last_modified, existing_children):
         ]
             dados_recursos = dados_filtrados[dados_filtrados['Tipo'] == 'Recursos']
             
+            
+            sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
             new_file = files_table.insert().values(
-                filename=filename, content=file_data, timestamp=datetime.utcnow().isoformat()
-            )
+                    filename=filename,
+                    content=file_data,
+                    timestamp=datetime.utcnow().isoformat() + 'Z'  # Adiciona 'Z' para indicar UTC
+)
             db_session.execute(new_file)
             db_session.commit()
 
