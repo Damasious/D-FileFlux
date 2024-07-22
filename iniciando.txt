@@ -1,0 +1,6 @@
+1- sudo docker-compose up
+
+2- export FLASK_APP=server.py                             
+export FLASK_SECRET_KEY="2b30558896e3d74159d55ebdba8e29c1379bf121735d773f"
+export DATABASE_URL="postgresql://root:example@localhost:5432/banana"
+flask run --port=7272

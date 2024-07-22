@@ -1,20 +1,27 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, Boolean, select, func, DateTime
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.sql import select
+import base64
 import datetime
-from datetime import datetime, timedelta 
-import dash, pytz
-from dash import html, dcc, Input, Output, State, dash_table
-from dash.exceptions import PreventUpdate
+import io
+import os
+from datetime import datetime, timedelta
+
+import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-import base64
+import pytz
+from dash import Input, Output, State, dash_table, dcc, html
+from dash.exceptions import PreventUpdate
 from dotenv import load_dotenv
-import os
-import io
+from flask import (Flask, flash, redirect, render_template, request, session,
+                   url_for)
+from flask_login import (LoginManager, UserMixin, current_user, login_required,
+                         login_user, logout_user)
+from sqlalchemy import (Boolean, Column, DateTime, Integer, MetaData, String,
+                        Table, create_engine, func, select)
+from sqlalchemy.orm import scoped_session, sessionmaker
+from werkzeug.security import check_password_hash, generate_password_hash
+
+hashed_password = generate_password_hash('Onslaught213141')
+print('aqui está: ',hashed_password)
 
 # Carrega variáveis de ambiente
 load_dotenv()
@@ -33,10 +40,9 @@ def make_session_permanent():
 def set_session_timeout():
     session.permanent = False
 
-
 DATABASE_URL = os.getenv('DATABASE_URL')
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
-engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})  # Assegura que a conexão use SSL
+engine = create_engine(DATABASE_URL, connect_args={"sslmode": "disable"})  # Assegura que a conexão use SSL
 metadata = MetaData(bind=engine)
 Session = sessionmaker(bind=engine)
 db_session = scoped_session(Session)
@@ -52,38 +58,14 @@ users_table = Table('users', metadata,
                     Column('email', String, primary_key=True),
                     Column('password_hash', String),
                     Column('superuser', Boolean, default=False))
+
 # Cria as tabelas no banco de dados
 metadata.create_all()
 
 # Configuração do Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(server)
-login_manager.login_view = 'login'
-
-@server.route('/', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect('/home')  # Redireciona se já estiver autenticado
-
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        user_record = db_session.query(users_table).filter_by(email=email).first()
-        if user_record:
-            print(f"Usuário encontrado: {user_record.email}")  # Depuração
-            if check_password_hash(user_record.password_hash, password):
-                user = User(user_record.email)
-                login_user(user)
-                print("Login bem-sucedido")  # Depuração
-                return redirect('/home')  # Redireciona para a home após login bem-sucedido
-            else:
-                print("Falha na verificação da senha")  # Depuração
-        else:
-            print("Usuário não encontrado")  # Depuração
-
-        flash('Login Failed. Please check username and password.')
-
-    return render_template('login.html')
+login_manager.login_view = 'login' # type: ignore
 
 # Classe de usuário
 class User(UserMixin):
@@ -91,27 +73,66 @@ class User(UserMixin):
         self.id = email
         self.superuser = superuser
 
-
-@login_manager.user_loader
 @login_manager.user_loader
 def load_user(user_id):
-    user_query = db_session.query(users_table).filter_by(email=user_id).first()
+    print(f"Tentando carregar usuário: {user_id}")  # Adiciona depuração
+    user_query = db_session.query(users_table).filter_by(email=user_id).first() # type: ignore
     if user_query:
-        user = User(user_query.email, user_query.superuser)  # Adicione o atributo superuser aqui
+        print(f"Usuário carregado: {user_query.email}")  # Adiciona depuração
+        user = User(user_query.email, user_query.superuser)
         return user
+    print("Usuário não encontrado durante o carregamento")  # Adiciona depuração
     return None
 
+@server.route('/', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        print("Usuário já autenticado, redirecionando para /home")  # Adiciona depuração
+        return redirect('/home')  # Redireciona se já estiver autenticado
+
+    if current_user.is_authenticated:
+        print("Usuário já autenticado, redirecionando para /home")  # Adiciona depuração
+        return redirect('/home')  # Redireciona se já estiver autenticado
+
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        print(f"Tentando login com email: {email}")  # Adiciona depuração
+        user_record = db_session.query(users_table).filter_by(email=email).first() # type: ignore
+        if user_record:
+            print(f"Usuário encontrado: {user_record.email}")  # Adiciona depuração
+            print(f"Hash no banco: {user_record.password_hash}")  # Adiciona depuração
+            if check_password_hash(user_record.password_hash, password):
+                user = User(user_record.email, user_record.superuser)
+                login_user(user)
+                print("Login bem-sucedido")  # Adiciona depuração
+                return redirect('/home')  # Redireciona para a home após login bem-sucedido
+            else:
+                print("Falha na verificação da senha")  # Adiciona depuração
+        else:
+            print("Usuário não encontrado")  # Adiciona depuração
+
+        flash('Login Failed. Please check username and password.')
+
+    return render_template('login.html')
+
+
+
 @server.route('/logout')
+@login_required
 def logout():
     logout_user()
-    return ('/')
+    return redirect(url_for('login'))
+
 
 
 def is_admin():
     return current_user.is_authenticated and current_user.id == ADMIN_EMAIL
 
+
+
 # Iniciar o aplicativo Dash
-app = dash.Dash(__name__, server=server, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
+app = dash.Dash(__name__, server=server, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True) # type: ignore
 
 app.index_string = """<!DOCTYPE html>
 <html>
@@ -148,7 +169,7 @@ app.layout = html.Div([
 )
 def handle_login(n_clicks, email, password):
     if n_clicks:
-        user_record = db_session.query(users_table).filter_by(email=email).first()
+        user_record = db_session.query(users_table).filter_by(email=email).first() # type: ignore
         if user_record and check_password_hash(user_record.password_hash, password):
             user = User(user_record.email)
             login_user(user)
@@ -163,7 +184,7 @@ def handle_login(n_clicks, email, password):
 )
 def display_page(pathname):
     if not current_user.is_authenticated:
-        return login_layout()
+        return home_layout()
 
     if pathname in ['/home', '/']:
         return home_layout()
@@ -183,13 +204,13 @@ def logout_redirect(n_clicks):
     return dash.no_update
 
 def query_data():
-    with engine.connect() as connection:
+    with engine.connect() as connection: # type: ignore
         df = pd.read_sql_query("SELECT * FROM uploaded_file", connection)
     return df
 
 def load_file_data(filename):
     try:
-        result = db_session.execute(select([files_table.c.content]).where(files_table.c.filename == filename)).fetchone()
+        result = db_session.execute(select([files_table.c.content]).where(files_table.c.filename == filename)).fetchone() # type: ignore
         if result:
             # Tentativa de decodificação como ISO-8859-1, que é mais abrangente que ASCII
             try:
@@ -222,9 +243,9 @@ def home_layout():
                     'textAlign': 'center', 'margin': '10px'
                 },
                 multiple=False
-            )
+            ) # type: ignore
         )
-        layout.append(html.Div(id='output-data-upload'))
+        layout.append(html.Div(id='output-data-upload')) # type: ignore
 
     # Carrega dados existentes do banco de dados
     try:
@@ -237,7 +258,7 @@ def home_layout():
                 dados_plano = dados_filtrados[dados_filtrados['Tipo'] == 'Plano']
                 dados_recursos = dados_filtrados[dados_filtrados['Tipo'] == 'Recursos']
                 layout.append(html.Div([
-                    html.H5(result.filename, style={'marginTop': '40px', 'marginBottom': '40px'}),
+                    html.H5(result.filename, style={'marginTop': '40px', 'marginBottom': '45px'}),
                     dbc.Tabs([
                         dbc.Tab(label='Assinaturas', children=[
                             dash_table.DataTable(
@@ -258,9 +279,9 @@ def home_layout():
                         ], tab_style={'backgroundColor': 'black', 'color': 'green'},
                           active_tab_style={'backgroundColor': 'green', 'color': 'black'}),
                     ], style={'marginBottom': '20px'}),
-                ]))
+                ])) # type: ignore
     except Exception as e:
-        layout.append(html.Div(str(e)))  # Exibe o erro para diagnóstico
+        layout.append(html.Div(str(e)))  # type: ignore # Exibe o erro para diagnóstico
     finally:
         session.close()  # Fecha a sessão do banco
     layout.append(
@@ -269,7 +290,7 @@ def home_layout():
             html.Button('Sair', id='logout-button', n_clicks=0, style={'backgroundColor': '#00ff00', 'color': 'black','float': 'right'}),
         ], style={
             'width': '100%', 'backgroundColor': 'black', 'color': '#00ff00', 'padding': '10px', 'borderTop': '1px solid green'
-        }),              
+        }),               # type: ignore
     )
 
     return html.Div(layout, style={'backgroundColor': 'black', 'color': '#00ff00'})
@@ -348,13 +369,13 @@ def update_output(contents, filename, last_modified, existing_children):
             
             
             sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
-            new_file = files_table.insert().values(
+            new_file = files_table.insert().values( # type: ignore
                     filename=filename,
                     content=file_data,
                     timestamp=datetime.utcnow().isoformat() + 'Z'  # Adiciona 'Z' para indicar UTC
 )
-            db_session.execute(new_file)
-            db_session.commit()
+            db_session.execute(new_file) # type: ignore
+            db_session.commit() # type: ignore
 
             # Construindo novos componentes HTML para serem exibidos
             new_upload = html.Div([
@@ -401,7 +422,7 @@ def update_view(pathname):
     if pathname == '/home':
         # Load files from database and display
         query = select([files_table])
-        results = db_session.execute(query).fetchall()
+        results = db_session.execute(query).fetchall() # type: ignore
         children = []
         for result in results:
             children.append(html.Div([
